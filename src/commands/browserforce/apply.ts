@@ -1,17 +1,43 @@
 import { Messages } from '@salesforce/core';
 import { BrowserforceCommand } from '../../browserforce-command';
+import { Flags } from '@salesforce/sf-plugins-core';
+import { ux } from '@oclif/core';
 
 Messages.importMessagesDirectory(__dirname);
 const messages = Messages.loadMessages(
-  'sfdx-browserforce-plugin',
+  '@dxatscale/browserforce',
   'browserforce'
 );
 
 export default class BrowserforceApply extends BrowserforceCommand {
   public static description = messages.getMessage('applyCommandDescription');
 
+
+  public static readonly flags: { [key: string]: any } = {
+    'target-org': Flags.requiredOrg(
+      {
+        char: 'o',
+      }
+    ),
+    definitionfile: Flags.string({
+      char: 'f',
+      description: messages.getMessage('definitionFileDescription')
+    }),
+    planfile: Flags.string({
+      char: 'p',
+      name: 'plan',
+      description: messages.getMessage('planFileDescription')
+    }),
+    statefile: Flags.string({
+      char: 's',
+      name: 'state',
+      description: messages.getMessage('stateFileDescription')
+    })
+
+  };
+  
   public static examples = [
-    `$ sfdx browserforce:apply -f ./config/setup-admin-login-as-any.json --targetusername myOrg@example.com
+    `$ sf browserforce:apply -f ./config/setup-admin-login-as-any.json --targetusername myOrg@example.com
   logging in... done
   Applying definition file ./config/setup-admin-login-as-any.json to org myOrg@example.com
   [Security] retrieving state... done
@@ -20,28 +46,30 @@ export default class BrowserforceApply extends BrowserforceCommand {
   `
   ];
 
-  public async run(): Promise<unknown> {
-    this.ux.log(
+  public async run(): Promise<any> {
+    const { flags } = await this.parse(BrowserforceApply);
+    
+    ux.log(
       `Applying definition file ${
-        this.flags.definitionfile
-      } to org ${this.org.getUsername()}`
+        flags.definitionfile
+      } to org ${flags['target-org'].getUsername()}`
     );
     for (const setting of this.settings) {
       const driver = setting.Driver;
-      const instance = new driver(this.bf, this.org);
-      this.ux.startSpinner(`[${driver.name}] retrieving state`);
+      const instance = new driver(this.bf, flags['target-org']);
+      this.spinner.start(`[${driver.name}] retrieving state`);
       let state;
       try {
         state = await instance.retrieve(setting.value);
       } catch (err) {
-        this.ux.stopSpinner('failed');
+       this.spinner.stop('failed');
         throw err;
       }
-      this.ux.stopSpinner();
+     this.spinner.stop();
       const action = instance.diff(state, setting.value);
-      this.ux.stopSpinner();
+     this.spinner.stop();
       if (action && Object.keys(action).length) {
-        this.ux.startSpinner(
+        this.spinner.start(
           `[${driver.name}] ${Object.keys(action)
             .map((key) => {
               return `changing '${key}' to '${JSON.stringify(action[key])}'`;
@@ -51,12 +79,12 @@ export default class BrowserforceApply extends BrowserforceCommand {
         try {
           await instance.apply(action);
         } catch (err) {
-          this.ux.stopSpinner('failed');
+         this.spinner.stop('failed');
           throw err;
         }
-        this.ux.stopSpinner();
+       this.spinner.stop();
       } else {
-        this.ux.log(`[${driver.name}] no action necessary`);
+        ux.log(`[${driver.name}] no action necessary`);
       }
     }
     return { success: true };
