@@ -34,7 +34,7 @@ export class Browserforce {
         // workaround for navigating frames https://github.com/puppeteer/puppeteer/issues/5123
         '--disable-features=site-per-process'
       ],
-      headless: !(process.env.BROWSER_DEBUG === 'true')
+      headless: !(process.env.BROWSER_DEBUG === 'new')
     });
     await this.openPage(
       `secur/frontdoor.jsp?sid=${
